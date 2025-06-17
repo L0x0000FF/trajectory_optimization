@@ -38,39 +38,41 @@ obj = cp.Minimize(p.T @ Q @ p)
 # start point & end point
 A_start = []
 for k in range(4):
-  Ak1 = []
-  
+  Ak1 = np.zeros(n*(r+1))
+  start = 0
   for i in range(r+1):
     if i < k:
-      Ak1.append(0)
+      Ak1[start+i] = 0
     else:
-      Ak1.append(math.factorial(i) / math.factorial(i-k) * T[0]**(i-k))
+      Ak1[start+i] = math.factorial(i) / math.factorial(i-k) * T[0]**(i-k)
   A_start.append(Ak1)
 A_start = np.array(A_start)
 d_start = np.zeros(4)
 
 A_end = []
 for k in range(4):
-  Ak2 = []
+  Ak2 = np.zeros(n*(r+1))
+  start = (n-1)*(r+1) - 1
   for i in range(r+1):
     if i < k:
-      Ak2.append(0)
+      Ak2[start+i] = 0
     else:
-      Ak2.append(math.factorial(i) / math.factorial(i-k) * T[-1]**(i-k))
+      Ak2[start+i] = math.factorial(i) / math.factorial(i-k) * T[-1]**(i-k)
   A_end.append(Ak2)
 A_end = np.array(A_end)
 d_end = np.zeros(4)
-print(A_end)
+# print(A_end)
 
 # waypoints
 A_waypoints = []
 for j in range(1,n-1,1):
-  A1 = []
+  A1 = np.zeros(n*(r+1))
+  start = j*(r+1) - 1
   for i in range(r+1):
-    A1.append(T[j]**i)
-  A2 = []
+    A1[start+i] = T[j]**i
+  A2 = np.zeros(n*(r+1))
   for i in range(r+1):
-    A2.append(T[j+1]**i)
+    A2[start+i] = T[j+1]**i
   A_waypoints.append(A1)
   A_waypoints.append(A2)
 A_waypoints = np.array(A_waypoints)
@@ -83,3 +85,25 @@ print(A_waypoints)
 print(d_waypoints)
 
 # continuity
+A_con = []
+for j in range(1,n-1,1):
+  for k in range(1,4,1):
+    A1 = np.zeros(n*(r+1))
+    start1 = j*(r+1) - 1
+    for i in range(r+1):
+      if i < k:
+        A1[start1+i] = 0
+      else:
+        A1[start1+i] = math.factorial(i) / math.factorial(i-k) * T[j]**(i-k)
+    start2 = (j+1)*(r+1) - 1
+    A2 = np.zeros(n*(r+1))
+    for i in range(r+1):
+      if i < k:
+        A2[start1+i] = 0
+      else:
+        A2[start2+i] = math.factorial(i) / math.factorial(i-k) * T[j+1]**(i-k)
+    A_con.append(A1-A2)
+d_con = np.zeros(len(A_con))
+A_con = np.array(A_con)
+print(A_con)
+print(d_con)
