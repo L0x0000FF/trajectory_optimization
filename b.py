@@ -4,39 +4,41 @@ from matplotlib import pyplot as plt
 import math
 from scipy.linalg import block_diag
 
-T = [0,1,3,8,9]
+T = [0,1,3,4,7]
 x_dim = 2
 x = [
-  [3,3],
-  [7,2],
-  [4,9],
-  [7,6],
-  [10,10]
+  [1,1],
+  [3,5],
+  [6,10],
+  [8,4],
+  [5,2]
 ]
+n = len(x) - 1
 x = np.array(x,dtype=np.float32)
 
-n = 4
 r = 5
 Q = block_diag()
 p = cp.Variable((n*(r+1),x_dim))
+opt_dim = 4
 for j in range(1,n+1):
   q = np.zeros(shape=(r+1,r+1))
   for i in range(r+1):
     for l in range(r+1):
-      if i < 4 or l < 4:
+      if i < opt_dim or l < opt_dim:
         q[i][l] = 0
       else:
-        q[i][l] = i*(i-1)*(i-2)*(i-3) * l*(l-1)*(l-2)*(l-3) / (i+l-7) * (T[j]**(i+l-7) - T[j-1]**(i+l-7))
+        q[i][l] = math.factorial(i) / math.factorial(i-opt_dim) * \
+                  math.factorial(l) / math.factorial(l-opt_dim) / \
+                  (i+l-2*opt_dim+1) * \
+                  (T[j]**(i+l-2*opt_dim+1) - T[j-1]**(i+l-2*opt_dim+1))
   if j > 1:
     Q = block_diag(Q,q)
   else:
     Q = q
-# print(Q)
-# print(p.value)
+  
 obj = 0
 for d in range(x_dim):
   obj += cp.quad_form(p[:,d],Q)
-# print(obj)
 
 # constraints
 # start point & end point
@@ -69,7 +71,6 @@ for k in range(4):
   d_end.append([0,0]) if k > 0 else d_end.append(x[-1])
 A_end = np.array(A_end)
 d_end = np.array(d_end)
-# print(A_end)
 
 # waypoints
 A_waypoints = []
@@ -88,30 +89,32 @@ for j in range(1,n,1):
   d_waypoints.append(x[j+1])
 A_waypoints = np.array(A_waypoints)
 d_waypoints = np.array(d_waypoints)
-# print(A_waypoints)
-# print(d_waypoints)
+np.set_printoptions(linewidth=np.inf,suppress=True)
 
-# continuity
+# continuity for v,a
 A_con = []
-for j in range(1,n-1,1):
-  for k in range(1,4,1):
+for j in range(0,n-1,1):
+  for k in range(1,3,1):
     A1 = np.zeros(n*(r+1))
-    start1 = j*(r+1) - 1
+    start1 = j*(r+1)
     for i in range(r+1):
       if i < k:
         A1[start1+i] = 0
       else:
         A1[start1+i] = math.factorial(i) / math.factorial(i-k) * T[j]**(i-k)
+
     A2 = np.zeros(n*(r+1))
-    start2 = (j+1)*(r+1) - 1
+    start2 = (j+1)*(r+1)
     for i in range(r+1):
       if i < k:
-        A2[start1+i] = 0
+        A2[start2+i] = 0
       else:
         A2[start2+i] = math.factorial(i) / math.factorial(i-k) * T[j]**(i-k)
     A_con.append(A1-A2)
 d_con = np.zeros((len(A_con),x_dim))
 A_con = np.array(A_con)
+print(np.array2string(A_con))
+print(np.array2string(d_con))
 
 A_eq = np.concatenate((A_start,A_end,A_waypoints,A_con),axis=0)
 d_eq = np.concatenate((d_start,d_end,d_waypoints,d_con),axis=0)
@@ -123,8 +126,8 @@ constraints = [A_eq @ p == d_eq]
 prob = cp.Problem(objective=cp.Minimize(obj),constraints=constraints)
 prob.solve()
 print(prob.status)
-print(prob.value)
-print(p.value)
+# print(prob.value)
+# print(p.value)
 
 # 轨迹可视化
 plt.figure(figsize=(10, 6))
@@ -147,9 +150,6 @@ for idx, t in enumerate(t_plot):
     seg = 0
     while seg < n-1 and t > T[seg+1]:
         seg += 1
-    
-    # # 计算相对时间
-    # t_rel = t - T[seg]
     
     # 计算位置 (x和y坐标)
     for dim in range(x_dim):
