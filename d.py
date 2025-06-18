@@ -20,22 +20,21 @@ r = 5
 np.set_printoptions(linewidth=np.inf,suppress=True)
 
 def getQ(T:list,r:int,opt_dim=4):
-  Q = []
+  n = len(T)
+  Q = None
   for j in range(0,len(T)):
     q = np.zeros(shape=(r+1,r+1))
     for i in range(r+1):
       for l in range(r+1):
-        if i < opt_dim or l < opt_dim:
-          q[i][l] = 0
-        else:
+        if i >= opt_dim and l >= opt_dim:
           q[i][l] = math.factorial(i) / math.factorial(i-opt_dim) * \
                     math.factorial(l) / math.factorial(l-opt_dim) / \
                     (i+l-2*opt_dim+1) * \
                     (T[j]**(i+l-2*opt_dim+1))
-    if j > 0:
-      Q = block_diag(Q,q)
-    else:
+    if Q is None:
       Q = q
+    else:
+      Q = block_diag(Q,q)
   return Q
 
 def getA(waypoints:list,T:list,r:int):
@@ -78,20 +77,20 @@ def getA(waypoints:list,T:list,r:int):
 
   A_wp = []
   d_wp = []
-  for j in range(1,n-1,1):
+  for j in range(1,n):
     A1 = np.zeros(n*(r+1))
-    start = j*(r+1)
+    start = (j-1)*(r+1)
     for i in range(r+1):
-      A1[start+i] = 0**i
+      A1[start+i] = T[j-1]**i
 
     A2 = np.zeros(n*(r+1))
-    start = (j+1)*(r+1)
+    start = j*(r+1)
     for i in range(r+1):
       A2[start+i] = T[j]**i
     A_wp.append(A1)
     A_wp.append(A2)
-    d_wp.append(x[j])
-    d_wp.append(x[j+1])
+    d_wp.append(waypoints[j])
+    d_wp.append(waypoints[j])
   A_wp = np.array(A_wp)
   d_wp = np.array(d_wp)
   print(A_wp)
@@ -100,22 +99,18 @@ def getA(waypoints:list,T:list,r:int):
 
   # continuity for x,v,a
   A_con = []
-  for j in range(0,n-1,1):
-    for k in range(0,3,1):
+  for j in range(1,n,1):
+    for k in range(1,4,1):
       A1 = np.zeros(n*(r+1))
-      start1 = j*(r+1)
+      start1 = (j-1)*(r+1)
       for i in range(r+1):
-        if i < k:
-          A1[start1+i] = 0
-        else:
-          A1[start1+i] = math.factorial(i) / math.factorial(i-k) * T[j]**(i-k)
+        if i >= k:
+          A1[start1+i] = math.factorial(i) / math.factorial(i-k) * T[j-1]**(i-k)
 
       A2 = np.zeros(n*(r+1))
-      start2 = (j+1)*(r+1)
+      start2 = j*(r+1)
       for i in range(r+1):
-        if i < k:
-          A2[start2+i] = 0
-        else:
+        if i >= k:
           A2[start2+i] = math.factorial(i) / math.factorial(i-k) * 0**(i-k)
       A_con.append(A1-A2)
   d_con = np.zeros((len(A_con),x_dim))
@@ -132,15 +127,16 @@ def getMinSnapTraj(waypoints:list,T:list,r:int,opt_dim=4):
   n_traj = len(T)
   x_dim = len(waypoints[0])
   Q = getQ(T,r,opt_dim)
-  A,d = getA(waypoints,T,r)
+  A_eq,d_eq = getA(waypoints,T,r)
   P = cp.Variable(shape=(n_traj*(r+1),x_dim))
   obj = 0
-  print(A.shape,Q.shape,P.shape)
+  print(A_eq.shape,Q.shape,P.shape)
+  print(d_eq)
   for d in range(x_dim):
     obj += cp.quad_form(P[:,d],Q)
-  constraints = [A @ P == d]
+  constraints = [A_eq @ P == d_eq]
   prob = cp.Problem(cp.Minimize(obj),constraints)
-  prob.solve()
+  prob.solve(verbose=True)
   print(prob.status)
   print(P.value)
   return P.value
